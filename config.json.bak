@@ -8,11 +8,7 @@
       "config_name": "default",
       "url_list": [
         ".*"
-      ],
-      "Basic-Auth": {
-        "username": "MyAccount1",
-        "password": "MyPassword1"
-      }
+      ]
     },
     {
       "config_name": "internal-server-1",
@@ -20,11 +16,10 @@
         "https://.*\\.mycompany\\.example\\.com(:\\d+){0,1}/.*"
       ],
       "Basic-Auth": {
-        "username": "MyAccount2",
-        "password": "MyPassword2"
+        "username": "MyAccount1",
+        "password": "MyPassword1"
       }
     },
-
     {
       "config_name": "github",
       "url_list": [
@@ -47,4 +42,5 @@
         "password": "pass456"
       }
     }
+  ]
 }
