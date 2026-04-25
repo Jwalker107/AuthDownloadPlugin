@@ -162,3 +162,4 @@ config.json
 .vscode/launch.json
 logfile.txt
 *.code-workspace
+.vscode/*
