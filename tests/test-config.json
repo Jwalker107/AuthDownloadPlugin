@@ -8,7 +8,9 @@
       "url_list": [
         ".*"
       ],
-      "token": ""
+      "Header": {
+        "Authorization": "token testing"
+      }
     },
     {
       "config_name": "github",
@@ -16,7 +18,9 @@
         "https://.*\\.github\\.com/.*",
         "https://.*\\.githubusercontent\\.com/.*"
       ],
-      "token": null
+      "Header": {
+        "Authorization": "token testing"
+      }
     }
   ]
 }

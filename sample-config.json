@@ -9,14 +9,20 @@
       "url_list": [
         ".*"
       ],
-      "token": null
+      "Basic-Auth": {
+        "username": "MyAccount1",
+        "password": "MyPassword1"
+      }
     },
     {
       "config_name": "internal-server-1",
       "url_list": [
         "https://.*\\.mycompany\\.example\\.com(:\\d+){0,1}/.*"
       ],
-      "token": null
+      "Basic-Auth": {
+        "username": "MyAccount2",
+        "password": "MyPassword2"
+      }
     },
 
     {
@@ -25,7 +31,10 @@
         "https://.*\\.github\\.com/.*",
         "https://.*\\.githubusercontent\\.com/.*"
       ],
-      "token": null
+      "Header": {
+        "Authorization": "token github_pat_XXXXXXX",
+        "Accept": "application/octet-stream"
+      }
     }
   ]
 }

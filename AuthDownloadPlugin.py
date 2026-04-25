@@ -2,7 +2,7 @@
 """
 THIS TOOL IS UNSUPPORTED
 Demonstrates a custom download-plugin for the BigFix Root Server.
-This sample demonstrates performing downloads using a GitHub User Token to authenticate and download file(s)
+This sample demonstrates performing downloads using configurable authentication headers and credentials.
 """
 #curl --header "Authorization: token github_pat_XXXXXXX" https://raw.githubusercontent.com/Jwalker107/AuthDownloadPlugin/main/README.md
 #curl -L -H "Accept: application/octet-stream" -H "Authorization: token github_pat_XXX" https://api.github.com/repos/Jwalker107/AuthDownloadPlugin/releases/assets/141569199 -O
@@ -11,6 +11,7 @@ import os
 import sys
 import json
 import re
+import base64
 import argparse
 import keyring
 import requests
@@ -18,6 +19,9 @@ import logging
 
 PLUGIN_NAME = "AuthDownloadPlugin"
 DEFAULT_DOWNLOAD_TIMEOUT_SECONDS = 60
+KEYRING_BASIC_USER_FIELD = "basic_username"
+KEYRING_BASIC_PASS_FIELD = "basic_password"
+KEYRING_HEADER_PREFIX = "header:"
 
 def init_logging(logfile:str, level:int=20 ) -> None:
     """Initializes the logging module to log to terminal and a log file"""
@@ -67,7 +71,7 @@ def get_args() -> argparse.Namespace:
 
 def get_config(config_file:str) -> dict:
     """Read configuration from config.json"""
-    # config.json stores options such as the download plugin name, log file name & log level, and optionally may have a 'token' value to store
+    # config.json stores options such as the download plugin name, log file name & log level
     try:
         with open(config_file, 'r') as json_file:
             config=json.load(json_file)
@@ -77,9 +81,17 @@ def get_config(config_file:str) -> dict:
         config= {}
     return config
 
-def get_token_identifier(config:dict, url_config:dict) -> str:
-    """Return a token identifier name for one url_config section of the config"""
+def get_credential_identifier(config:dict, url_config:dict) -> str:
+    """Return a credential identifier name for one url_config section of the config"""
     return f"{config.get('plugin_name', PLUGIN_NAME)}_{url_config.get('config_name', 'UnNamed')}"
+
+def get_basic_auth(config:dict, url_config:dict) -> dict | None:
+    """Return Basic-Auth dictionary from one url_config section, if present."""
+    return url_config.get("Basic-Auth", None)
+
+def get_header_config(config:dict, url_config:dict) -> dict | None:
+    """Return Header dictionary from one url_config section, if present."""
+    return url_config.get("Header", None)
 
 def validate_config(config:dict) -> list[str]:
     """Validate expected config.json structure and return a list of validation errors."""
@@ -134,42 +146,120 @@ def validate_config(config:dict) -> list[str]:
                     f"Invalid regex in url_configs[{idx}].url_list[{pattern_index}]: {str(e)}"
                 )
 
+        if "Basic-Auth" in url_config:
+            basic_auth = get_basic_auth(config, url_config)
+            if not isinstance(basic_auth, dict):
+                errors.append(f"url_configs[{idx}].Basic-Auth must be an object when provided.")
+            else:
+                username = basic_auth.get("username", None)
+                password = basic_auth.get("password", None)
+                if username is not None and not isinstance(username, str):
+                    errors.append(f"url_configs[{idx}].Basic-Auth.username must be a string or null.")
+                if password is not None and not isinstance(password, str):
+                    errors.append(f"url_configs[{idx}].Basic-Auth.password must be a string or null.")
+                if (username is None) != (password is None):
+                    errors.append(
+                        f"url_configs[{idx}].Basic-Auth must provide both username and password together, or both null."
+                    )
+
+        if "Header" in url_config:
+            header_config = get_header_config(config, url_config)
+            if not isinstance(header_config, dict):
+                errors.append(f"url_configs[{idx}].Header must be an object when provided.")
+            else:
+                for header_name, header_value in header_config.items():
+                    if not isinstance(header_name, str) or not header_name.strip():
+                        errors.append(f"url_configs[{idx}].Header keys must be non-empty strings.")
+                        continue
+                    if header_value is not None and not isinstance(header_value, str):
+                        errors.append(
+                            f"url_configs[{idx}].Header['{header_name}'] must be a string or null."
+                        )
+
     return errors
 
-def update_token(config:dict, config_file:str) -> None:
-    """Checks whether an updated token is present in the configuration file.  If so, update the keyring and remove the token from the file."""
+def update_credentials(config:dict, config_file:str) -> None:
+    """Store basic-auth/header values in keyring and remove plaintext values from config.json."""
     updates_found=False
     for url_config in config.get('url_configs', []):
-        token_identifier=get_token_identifier(config, url_config)
-        if url_config.get('token', None) is not None:
-            updates_found=True
-            logging.info(f'Storing token to keyring for {token_identifier}')
-            keyring.set_password(
-                token_identifier,
-                # dummy username:
-                "AuthDownloadPlugin",
-                url_config.get('token')
-            )
-            url_config['token']=None
-            logging.info(f'Removing token from config file for config {token_identifier}')
+        credential_identifier=get_credential_identifier(config, url_config)
+
+        basic_auth = get_basic_auth(config, url_config)
+        if isinstance(basic_auth, dict):
+            username = basic_auth.get("username", None)
+            password = basic_auth.get("password", None)
+            if username is not None and password is not None:
+                updates_found=True
+                logging.info(f"Storing basic auth credentials to keyring for {credential_identifier}")
+                keyring.set_password(credential_identifier, KEYRING_BASIC_USER_FIELD, username)
+                keyring.set_password(credential_identifier, KEYRING_BASIC_PASS_FIELD, password)
+                basic_auth["username"] = None
+                basic_auth["password"] = None
+                logging.info(f"Removing basic auth values from config file for config {credential_identifier}")
+
+        header_config = get_header_config(config, url_config)
+        if isinstance(header_config, dict):
+            for header_name, header_value in header_config.items():
+                if header_value is None:
+                    continue
+                updates_found=True
+                keyring_username = f"{KEYRING_HEADER_PREFIX}{header_name}"
+                logging.info(f"Storing header value in keyring for {credential_identifier}:{header_name}")
+                keyring.set_password(credential_identifier, keyring_username, header_value)
+                header_config[header_name] = None
+                logging.info(f"Removing header value from config file for config {credential_identifier}:{header_name}")
 
     if updates_found:
         set_config(config, config_file)
 
 def set_config(config:dict, config_file:str) -> None:
     """Write updated configuration to config.json"""
-    # If the config file contained a 'token' value, we will re-write the file to remove that value after storing it in the keyring
+    # If the config file contained Basic-Auth/Header values, re-write the file to remove plaintext values after storing them in the keyring
     with open(config_file, 'w') as file:
         json.dump(config, file, indent=2)
 
-
-def get_token(identifier:str) -> str:
-    logging.info(f"Retrieving keyring credential for {identifier}")
-    token_container=keyring.get_credential(identifier, "AuthDownloadPlugin")
-    if token_container is None:
+def get_basic_auth_value(identifier:str) -> tuple[str, str] | None:
+    """Retrieve Basic auth username and password from keyring for one url config identifier."""
+    username = keyring.get_password(identifier, KEYRING_BASIC_USER_FIELD)
+    password = keyring.get_password(identifier, KEYRING_BASIC_PASS_FIELD)
+    if username is None and password is None:
         return None
+    if username is None or password is None:
+        return None
+    return (username, password)
 
-    return token_container.password
+def get_header_value(identifier:str, header_name:str) -> str | None:
+    """Retrieve one configured header value from keyring."""
+    keyring_username = f"{KEYRING_HEADER_PREFIX}{header_name}"
+    return keyring.get_password(identifier, keyring_username)
+
+def get_request_headers(config:dict, url_config:dict) -> dict:
+    """Build request headers for a matched url_config from keyring-backed values."""
+    credential_identifier = get_credential_identifier(config, url_config)
+    headers = {}
+
+    basic_auth = get_basic_auth(config, url_config)
+    if isinstance(basic_auth, dict):
+        basic_auth_values = get_basic_auth_value(credential_identifier)
+        if basic_auth_values is None:
+            raise ValueError(
+                f"Failed to retrieve basic auth credentials for {credential_identifier}, try adding Basic-Auth values to config.json"
+            )
+        user_pass = f"{basic_auth_values[0]}:{basic_auth_values[1]}".encode("utf-8")
+        encoded = base64.b64encode(user_pass).decode("ascii")
+        headers["Authorization"] = f"Basic {encoded}"
+
+    header_config = get_header_config(config, url_config)
+    if isinstance(header_config, dict):
+        for header_name in header_config.keys():
+            header_value = get_header_value(credential_identifier, header_name)
+            if header_value is None:
+                raise ValueError(
+                    f"Failed to retrieve header value for {credential_identifier}:{header_name}, try adding Header values to config.json"
+                )
+            headers[header_name] = header_value
+
+    return headers
 
 def match_url_to_config(url:str, config:dict) -> dict:
     """Given a download URL and a configuration dictionary, return the url_config dictionary that most closely matches the URL"""
@@ -212,6 +302,7 @@ def download_file_stream(
     session:requests.Session = requests.Session(),
     url:str = None,
     output_file_path:str = None,
+    request_headers:dict = None,
     timeout_seconds:float = DEFAULT_DOWNLOAD_TIMEOUT_SECONDS,
     chunk_size:int = 8192,
     block_count:int = 4,
@@ -230,6 +321,7 @@ def download_file_stream(
         url,
         stream=True,
         allow_redirects=True,
+        headers=request_headers,
         timeout=(10, timeout_seconds),
     ) as response:
         if not response.ok:
@@ -255,7 +347,7 @@ def replace_url(url:str, plugin_system_name:str) -> str:
     # instead of only https://
     return url.replace(f"{plugin_system_name}://", "https://")
 
-def process_download(download_request:dict, plugin_system_name:str, session:requests.Session, timeout_seconds:float) -> dict:
+def process_download(download_request:dict, plugin_system_name:str, session:requests.Session, timeout_seconds:float, request_headers:dict | None = None) -> dict:
     """Process a single download request and return a dictionary describing success/failure status"""
     result = {}
     logging.info(f"Processing download id {download_request['id']}")
@@ -269,6 +361,7 @@ def process_download(download_request:dict, plugin_system_name:str, session:requ
             session=session,
             url=url,
             output_file_path=download_request.get("file"),
+            request_headers=request_headers,
             timeout_seconds=timeout_seconds,
             chunk_size=65536
         )
@@ -305,17 +398,16 @@ def process_download_list(options:dict, config:dict, session:requests.Session, c
             download_result={'id': download['id'], 'success': False, 'error': f'Failed to match requested url {download.get("url")} to a url_config in config.json'}
             results.append(download_result)
             continue
-        # report a download error if an auth token could not be retrieved for the matched url_configs entry
-        token_identifier=get_token_identifier(config, url_config)
-        token=get_token(token_identifier)
-        if token is None:
-            download_result={'id': download['id'], 'success': False, 'error': f'Failed to retrieve auth token for {token_identifier}, try adding token to config.json'}
+        # report a download error if auth values could not be retrieved for the matched url_config entry
+        try:
+            request_headers = get_request_headers(config, url_config)
+        except Exception as e:
+            download_result={'id': download['id'], 'success': False, 'error': str(e)}
             results.append(download_result)
             continue
 
         # Attempt to perform the download and report the actual download result
-        session.headers.update({"Authorization": f"token {token}"})
-        download_result=process_download(download, plugin_system_name, session, timeout_seconds)
+        download_result=process_download(download, plugin_system_name, session, timeout_seconds, request_headers=request_headers)
         download_result['id']=download['id']
         results.append(download_result)
     return results
@@ -362,12 +454,9 @@ def main(downloads=None) -> None:
             config_error_message = f"Failed to validate configuration file at {config_file}."
             config = {}
 
-
-
-    # If 'token' has a value in any url_configs stanza in config.json, use keyring to encrypt the token and then remove it from the config file
-    # Note - we want to update *all* tokens *anywhere* in the config, before attempting downloads, so we can be sure the plaintext
-    # token is removed from the config file as soon as possible
-    update_token(config, config_file)
+    # If Basic-Auth/Header have plaintext values in any url_configs stanza, store them in keyring
+    # and remove plaintext from config.json before attempting downloads.
+    update_credentials(config, config_file)
 
     # process command-line arguments to get the --downloads parameter - the path to a json file containing a list of downloads
     args = argparse.Namespace
