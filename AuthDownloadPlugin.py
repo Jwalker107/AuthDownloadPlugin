@@ -16,6 +16,9 @@ import keyring
 import requests
 import logging
 
+PLUGIN_NAME = "AuthDownloadPlugin"
+DEFAULT_DOWNLOAD_TIMEOUT_SECONDS = 60
+
 def init_logging(logfile:str, level:int=20 ) -> None:
     """Initializes the logging module to log to terminal and a log file"""
     logging.basicConfig(
@@ -76,7 +79,62 @@ def get_config(config_file:str) -> dict:
 
 def get_token_identifier(config:dict, url_config:dict) -> str:
     """Return a token identifier name for one url_config section of the config"""
-    return f"{config.get('plugin_name', 'AuthDownloadPlugin')}_{url_config.get('config_name', 'UnNamed')}"
+    return f"{config.get('plugin_name', PLUGIN_NAME)}_{url_config.get('config_name', 'UnNamed')}"
+
+def validate_config(config:dict) -> list[str]:
+    """Validate expected config.json structure and return a list of validation errors."""
+    errors = []
+
+    if not isinstance(config, dict):
+        return ["Configuration must be a JSON object."]
+
+    plugin_name = config.get("plugin_name")
+    if plugin_name is None:
+        errors.append(f"Missing required field 'plugin_name' (expected '{PLUGIN_NAME}').")
+    elif plugin_name != PLUGIN_NAME:
+        errors.append(
+            f"Invalid plugin_name '{plugin_name}'. Expected '{PLUGIN_NAME}'."
+        )
+
+    timeout_seconds = config.get("download_timeout_seconds", DEFAULT_DOWNLOAD_TIMEOUT_SECONDS)
+    if not isinstance(timeout_seconds, (int, float)) or timeout_seconds <= 0:
+        errors.append(
+            "Invalid 'download_timeout_seconds'. Expected a positive number of seconds."
+        )
+
+    url_configs = config.get("url_configs")
+    if not isinstance(url_configs, list) or len(url_configs) == 0:
+        errors.append("Missing or invalid 'url_configs'. Expected a non-empty array.")
+        return errors
+
+    for idx, url_config in enumerate(url_configs):
+        if not isinstance(url_config, dict):
+            errors.append(f"url_configs[{idx}] must be an object.")
+            continue
+
+        config_name = url_config.get("config_name")
+        if not isinstance(config_name, str) or not config_name.strip():
+            errors.append(f"url_configs[{idx}].config_name must be a non-empty string.")
+
+        url_list = url_config.get("url_list")
+        if not isinstance(url_list, list) or len(url_list) == 0:
+            errors.append(f"url_configs[{idx}].url_list must be a non-empty array.")
+            continue
+
+        for pattern_index, pattern in enumerate(url_list):
+            if not isinstance(pattern, str):
+                errors.append(
+                    f"url_configs[{idx}].url_list[{pattern_index}] must be a string."
+                )
+                continue
+            try:
+                re.compile(pattern)
+            except re.error as e:
+                errors.append(
+                    f"Invalid regex in url_configs[{idx}].url_list[{pattern_index}]: {str(e)}"
+                )
+
+    return errors
 
 def update_token(config:dict, config_file:str) -> None:
     """Checks whether an updated token is present in the configuration file.  If so, update the keyring and remove the token from the file."""
@@ -154,6 +212,7 @@ def download_file_stream(
     session:requests.Session = requests.Session(),
     url:str = None,
     output_file_path:str = None,
+    timeout_seconds:float = DEFAULT_DOWNLOAD_TIMEOUT_SECONDS,
     chunk_size:int = 8192,
     block_count:int = 4,
 ) -> None:
@@ -165,7 +224,14 @@ def download_file_stream(
     if url is None or output_file_path is None:
         raise ValueError(f"url or output_file_path not defined")
 
-    with session.get(url, stream=True, allow_redirects=True) as response:
+    # requests timeout tuple is (connect timeout, read timeout). The read timeout
+    # enforces "no data received for N seconds" behavior.
+    with session.get(
+        url,
+        stream=True,
+        allow_redirects=True,
+        timeout=(10, timeout_seconds),
+    ) as response:
         if not response.ok:
             raise ValueError(
                 f"Download connection failed for {url} with HTTP {response.status_code}"
@@ -189,7 +255,7 @@ def replace_url(url:str, plugin_system_name:str) -> str:
     # instead of only https://
     return url.replace(f"{plugin_system_name}://", "https://")
 
-def process_download(download_request:dict, plugin_system_name:str, session:requests.Session) -> dict:
+def process_download(download_request:dict, plugin_system_name:str, session:requests.Session, timeout_seconds:float) -> dict:
     """Process a single download request and return a dictionary describing success/failure status"""
     result = {}
     logging.info(f"Processing download id {download_request['id']}")
@@ -203,6 +269,7 @@ def process_download(download_request:dict, plugin_system_name:str, session:requ
             session=session,
             url=url,
             output_file_path=download_request.get("file"),
+            timeout_seconds=timeout_seconds,
             chunk_size=65536
         )
         result["success"] = True
@@ -214,19 +281,21 @@ def process_download(download_request:dict, plugin_system_name:str, session:requ
         result["error"] = str(e)
     return result
 
-def process_download_list(options:dict, config:dict, session:requests.Session) -> list[dict]:
+def process_download_list(options:dict, config:dict, session:requests.Session, config_error_message:str=None) -> list[dict]:
     """
     Process the download requests provided in 'options' dictionary, using url configurations defined in 'config', with a reusable requsts.Session.
     Return a list of download result dictionary entries.
     """
     # TODO: This is tuned for ease-of-use rather than performance.
     # Currently each download is performed sequentially, not in parallel; room for improvement
-    plugin_system_name = config.get('plugin_name', "AuthDownloadPlugin")
+    plugin_system_name = config.get('plugin_name', PLUGIN_NAME)
+    timeout_seconds = config.get("download_timeout_seconds", DEFAULT_DOWNLOAD_TIMEOUT_SECONDS)
     results = []
     for download in options.get("downloads", []):
         # report a download error if the config.json file could not be loaded (missing or bad JSON syntax)
         if not config:
-            download_result={'id': download['id'], 'success': False, 'error': f'Failed to load configuration file, check existence and syntax'}
+            error_message = config_error_message or 'Failed to load configuration file, check existence and syntax'
+            download_result={'id': download['id'], 'success': False, 'error': error_message}
             results.append(download_result)
             continue
         # report a download error if the requested URL could not be matched to an entry in config.url_configs
@@ -246,7 +315,7 @@ def process_download_list(options:dict, config:dict, session:requests.Session) -
 
         # Attempt to perform the download and report the actual download result
         session.headers.update({"Authorization": f"token {token}"})
-        download_result=process_download(download, plugin_system_name, session)
+        download_result=process_download(download, plugin_system_name, session, timeout_seconds)
         download_result['id']=download['id']
         results.append(download_result)
     return results
@@ -269,16 +338,29 @@ def main(downloads=None) -> None:
     scriptPath=get_script_path()
     config_file=os.path.join(scriptPath, 'config.json')
     config=get_config(config_file)
+    config_error_message = None
 
     # it would be *nice* to init logging earlier, but...currently allow the config_file to specify an alternate log file so need to read config first
     # supply a default of 'scriptPath\\logfile.txt' in case the config file could not be loaded or is missing this entry
-    log_file=config.get('log', os.path.join(scriptPath, 'logfile.txt'))
-    init_logging(log_file, level=config.get('log_level', 20))
+    log_file = os.path.join(scriptPath, 'logfile.txt')
+    log_level = 20
+    if isinstance(config, dict):
+        log_file=config.get('log', log_file)
+        log_level=config.get('log_level', log_level)
+    init_logging(log_file, level=log_level)
 
     # note: we need to continue the script even if the config could not be downloaded;
     # we want to process the downloads.json in order to report the 'cannot load config' status to the server as if it were a download result
     if not config:
         logging.warning(f'Configuration file not found or cannot be loaded at {config_file}')
+        config_error_message = f'Failed to load configuration file at {config_file}, check existence and syntax'
+    else:
+        config_errors = validate_config(config)
+        if config_errors:
+            for error in config_errors:
+                logging.error(f"Configuration validation error: {error}")
+            config_error_message = f"Failed to validate configuration file at {config_file}."
+            config = {}
 
 
 
@@ -306,7 +388,7 @@ def main(downloads=None) -> None:
         raise e
 
     session=setup_session()
-    results=process_download_list(options, config, session)
+    results=process_download_list(options, config, session, config_error_message=config_error_message)
     # Send download status results to the message file, where it will be read by the Server to provide action status / error messages to the console
     # currently we only update status when the downloads have completed or failed; but it is possible to update status for downloads-in-progress.
     logging.info(f"Results: {str(results)}")

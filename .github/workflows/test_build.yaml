@@ -69,5 +69,5 @@ jobs:
       #   uses: actions/upload-artifact@v4
       #   with:
       #     name: AuthDownloadPluginBinary
-      #     path: ./dist/TokenAuthDownloa*
+      #     path: ./dist/AuthDownloadPlugin*
       #     retention-days: 90

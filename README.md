@@ -1,6 +1,6 @@
 # AuthDownloadPlugin
 BigFix Download Plug-In for Authenticated HTTPS downloads using authentication (i.e. GitHub).
-This is a generalization and replacement for BESTokenAuthDownload at https://github.com/Jwalker107/BESTokenAuthDownloadPlugin.  This version adds options for Basic Auth.
+This is a generalization and replacement for an earlier version of this plugin.  This version adds options for Basic Auth.
 
 Requires Python 3.9+
 
@@ -10,7 +10,7 @@ Requires Python 3.9+
 * Install requirements
   - pip install -r requirements.txt
 * Test script loads
-  - python AuthDownload.py -h
+  - python AuthDownloadPlugin.py -h
 * Create executable
   - pyinstaller --onefile AuthDownloadPlugin.py
   - generates dist\AuthDownloadPlugin\AuthDownloadPlugin.exe
@@ -37,19 +37,21 @@ Create the target directory (`C:\Program Files (x86)\BigFix Enterprise\BES Serve
 * The config.json contains a stanza for `url_configs` allowing to specify multiple configurations.
   - Each url configuration contains a a `url_list` array.  Each element is a Regular Expression.  The requested download URL is compared to each regular expression in the `url_list`.  If the requested url matches multiple `url_list` entries, the longest regular expression matched is selected.
   - Update the `token` entry of each `url_config` when first installing the Download Plug-In, and whenever the given token is updated.
-  - Provide a unique `config_name` value for each `url_configs` entry. The top-level `plugin_name` is combined with each `url_configs.config_name` to determine the name of the token that will be stored in the Keyring (Windows Credential Manager on Windows, by default).  I.e. `TokenAuthPlugin_configuration1`
+  - Provide a unique `config_name` value for each `url_configs` entry. The top-level `plugin_name` is combined with each `url_configs.config_name` to determine the name of the token that will be stored in the Keyring (Windows Credential Manager on Windows, by default).  I.e. `AuthDownloadPlugin_configuration1`
+  - `download_timeout_seconds` controls how long a download can go without receiving any data before timing out. Default is `60`.
   - Hint: To use the same token for _all_ urls, a default regex to 'match anything' is `.*`
   - Hint: In a Regular Expression, the '`.`' symbol is a wildcard that matches any character.  To literally match the '.' symbols in `server.domain.com` one must escape the '.' character as `server\.domain\.com`.  Further, in JSON the backslash character must be escaped as `\\`, so to match a URL of `"https://<anything>.example.com/<anything>"` the config.json entry should read `"https://.*\\.example\\.com/.*"`
 * The next time the plugin runs (triggered by a download command in an Action Script), the all provided token values will be removed from the config.json and stored in the system keyring (Windows Credential Manager, by default, on Windows; see Python Keyring module docs for info on other platforms)
   - _Note_: Because the keyring is stored per-user, saving the token in the keyring *must* be performed by the user account of the BESRootServer service (LocalSystem, by default); so the key should be stored by issuing a BigFix Action that references the plug-in, to ensure the Download PlugIn is executed by the BESRootServer process.
 
 ## Example config.json:
-The following example configuration defines three configurations.  The url_configs and token for 'default' will be used for any download that does not match one of the other two example url_configs entries.  Three tokens may be stored; they will be named `AuthDownloadPlugin_default`, `TokenAuthConfig_internal-server-1`, or `TokenAuthConfig_github`.  On first run, the "token" value in the 'default' stanza will be removed from the configuration file and stored in the system keyring.
+The following example configuration defines three configurations.  The url_configs and token for 'default' will be used for any download that does not match one of the other two example url_configs entries.  Three tokens may be stored; they will be named `AuthDownloadPlugin_default`, `AuthDownloadPlugin_internal-server-1`, or `AuthDownloadPlugin_github`.  On first run, the "token" value in the 'default' stanza will be removed from the configuration file and stored in the system keyring.
 
     {
       "plugin_name": "AuthDownloadPlugin",
       "log": "c:\\temp\\logfile.txt",
       "log_level": 20,
+      "download_timeout_seconds": 60,
       "url_configs": [
         {
           "config_name": "default",
@@ -95,7 +97,7 @@ To get the URL to a release asset for a GitHub repo, you may use a REST API clie
 For troubleshooting, check the logfile.txt in the download plugin directory.  For more detailed logging, modify config.json and set log_level to 20 or to 10 (lower log level = more messages)
 
 ## To test the plugin outside of BigFix
-* Ensure a valid config.json exists in the directory of the script or executable version of TokenDownloadPlugin.
+* Ensure a valid config.json exists in the directory of the script or executable version of AuthDownloadPlugin.
 * Create a downloads.json file (see 'sample-downloads.json' in this repo for an example).
 * Execute _either_ the compiled AuthDownloadPlugin.exe _or_ the Python script.  Use the command-line arguments `--downloads "path_to_sample_downloads.json"`.  i.e.
   - AuthDownloadPlugin.exe --downloads "c:\temp\sample-downloads.json"
