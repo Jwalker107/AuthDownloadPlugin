@@ -2,7 +2,7 @@
 BigFix Download Plug-In for Authenticated HTTPS downloads using authentication (i.e. GitHub).
 This is a generalization and replacement for an earlier version of this plugin.  This version adds options for Basic Auth.
 
-Requires Python 3.9+
+Requires Python 3.10+
 
 **This is not a supported BigFix tool and is for demonstration purposes.  Use at your own risk**
 
