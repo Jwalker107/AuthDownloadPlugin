@@ -97,12 +97,41 @@ The following example configuration defines three configurations.  The `default`
 
     }
 
-To use the plugin, create a download action message such as
-`prefetch bigfix.png sha1:9b84643d03b11e0d196c2967d7f870b1c212c165 size:4083 AuthDownloadPlugin://api.github.com/repos/Jwalker107/AuthDownloadPlugin/releases/assets/141569199 sha256:b658f7f01256d9f4a30270375050b829a99cc9ad8738463bc7c582fd6c3ee9bb`
 
-To get the URL to a release asset for a GitHub repo, you may use a REST API client or curl command to retrieve, such as
 
-    curl -H "Accept: application/json" -H "Authorization: token github_pat_XXX" https://api.github.com/repos/Jwalker107/AuthDownloadPlugin/releases
+## Github Downloads
+
+### Listing Release Content
+
+```
+curl -H "Accept: application/json" -H "Authorization: token github_pat_XXX" https://api.github.com/repos/Jwalker107/AuthDownloadPlugin/releases
+```
+This will return a JSON describing every release version, and the release assets, from the repository.  Among the fields for a release are
+```
+{
+    "tag_name": "0.3",
+    "target_commitish": "main",
+    "name": "AuthDownloadPlugin first release",
+    "assets": [
+      {
+        "url": "https://api.github.com/repos/Jwalker107/AuthDownloadPlugin/releases/assets/405517117",
+        "id": 405517117,
+        "node_id": "RA_kwDOSMgBq84YK7M9",
+        "name": "bigfix.png",
+        "browser_download_url": "https://github.com/Jwalker107/AuthDownloadPlugin/releases/download/0.3/bigfix.png"
+      }
+     ]
+}
+```
+From this field, we should be able to target either 'url' or 'browser_download_url' for the download statements in BigFix.
+
+### BigFix Action Download
+
+```
+prefetch bigfix.png sha1:9b84643d03b11e0d196c2967d7f870b1c212c165 size:4083 AuthDownloadPlugin://api.github.com/repos/Jwalker107/AuthDownloadPlugin/releases/assets/405517117 sha256:b658f7f01256d9f4a30270375050b829a99cc9ad8738463bc7c582fd6c3ee9bb
+```
+
+    
 
 For troubleshooting, check the logfile.txt in the download plugin directory.  For more detailed logging, modify config.json and set log_level to 20 or to 10 (lower log level = more messages)
 
