@@ -1,5 +1,5 @@
 """
-automated test for TokenAuthDownload.py
+automated test for AuthDownloadPlugin.py
 """
 
 import json
@@ -11,8 +11,8 @@ sys.path.append(
     os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 )
 
-# import the main python module for this repo TokenAuthDownload.py
-import TokenAuthDownload
+# import the main python module for this repo AuthDownloadPlugin.py
+import AuthDownloadPlugin
 
 def main() -> None:
     """execution of tests starts here."""
@@ -40,11 +40,11 @@ def main() -> None:
 
     # print(f"config: {config_json_real}")
 
-    print(f"script path: {TokenAuthDownload.get_script_path()}")
+    print(f"script path: {AuthDownloadPlugin.get_script_path()}")
 
     print("run test")
-    # print(f"script path {TokenAuthDownload.get_script_path}")
-    results = TokenAuthDownload.main(downloads="tests/test-downloads.json")
+    # print(f"script path {AuthDownloadPlugin.get_script_path}")
+    results = AuthDownloadPlugin.main(downloads="tests/test-downloads.json")
 
     print("cleanup test config files")
     os.remove(config_path)

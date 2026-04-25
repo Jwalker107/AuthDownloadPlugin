@@ -76,7 +76,7 @@ def get_config(config_file:str) -> dict:
 
 def get_token_identifier(config:dict, url_config:dict) -> str:
     """Return a token identifier name for one url_config section of the config"""
-    return f"{config.get('plugin_name', 'TokenAuthDownload')}_{url_config.get('config_name', 'UnNamed')}"
+    return f"{config.get('plugin_name', 'AuthDownloadPlugin')}_{url_config.get('config_name', 'UnNamed')}"
 
 def update_token(config:dict, config_file:str) -> None:
     """Checks whether an updated token is present in the configuration file.  If so, update the keyring and remove the token from the file."""
@@ -89,7 +89,7 @@ def update_token(config:dict, config_file:str) -> None:
             keyring.set_password(
                 token_identifier,
                 # dummy username:
-                "TokenAuthDownload",
+                "AuthDownloadPlugin",
                 url_config.get('token')
             )
             url_config['token']=None
@@ -107,7 +107,7 @@ def set_config(config:dict, config_file:str) -> None:
 
 def get_token(identifier:str) -> str:
     logging.info(f"Retrieving keyring credential for {identifier}")
-    token_container=keyring.get_credential(identifier, "TokenAuthDownload")
+    token_container=keyring.get_credential(identifier, "AuthDownloadPlugin")
     if token_container is None:
         return None
 
@@ -221,7 +221,7 @@ def process_download_list(options:dict, config:dict, session:requests.Session) -
     """
     # TODO: This is tuned for ease-of-use rather than performance.
     # Currently each download is performed sequentially, not in parallel; room for improvement
-    plugin_system_name = config.get('plugin_name', "TokenAuthDownload")
+    plugin_system_name = config.get('plugin_name', "AuthDownloadPlugin")
     results = []
     for download in options.get("downloads", []):
         # report a download error if the config.json file could not be loaded (missing or bad JSON syntax)

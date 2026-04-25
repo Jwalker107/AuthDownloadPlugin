@@ -1,5 +1,5 @@
 {
-  "plugin_name": "TokenAuthDownload",
+  "plugin_name": "AuthDownloadPlugin",
   "log": "c:\\temp\\logfile.txt",
   "log_level": 20,
   "url_configs": [
@@ -17,7 +17,7 @@
       ],
       "token": null
     },
-    
+
     {
       "config_name": "github",
       "url_list": [

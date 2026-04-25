@@ -50,7 +50,7 @@ jobs:
         run: if [ -f requirements.txt ]; then pip install -r requirements.txt; fi
 
       - name: Test Run Without Error
-        run: python TokenAuthDownload.py -h
+        run: python AuthDownloadPlugin.py -h
 
       - name: Run Tests
         run: python tests/tests.py
@@ -58,16 +58,16 @@ jobs:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
       - name: Test pyinstaller build
-        run: pyinstaller --clean --onefile ./TokenAuthDownload.py
+        run: pyinstaller --clean --onefile ./AuthDownloadPlugin.py
 
-      - name: Test TokenAuthDownload binary runs
-        run: ./dist/TokenAuthDownload -h
+      - name: Test AuthDownloadPlugin binary runs
+        run: ./dist/AuthDownloadPlugin -h
 
       # - name: Upload build artifact
       #   # https://github.com/actions/upload-artifact
       #   if: runner.os == 'Windows'
       #   uses: actions/upload-artifact@v4
       #   with:
-      #     name: TokenAuthDownloadBinary
+      #     name: AuthDownloadPluginBinary
       #     path: ./dist/TokenAuthDownloa*
       #     retention-days: 90

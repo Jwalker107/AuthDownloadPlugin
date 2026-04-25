@@ -5,21 +5,21 @@
     {
       "id": 5502,
       "file": "C:\\Temp\\test_download\\active_download_5502",
-      "url": "TokenAuthDownload://raw.githubusercontent.com/Jwalker107/BESTokenAuthDownloadPlugin/main/README.md",
+      "url": "AuthDownloadPlugin://raw.githubusercontent.com/Jwalker107/AuthDownloadPlugin/main/README.md",
       "sha1": "",
       "size": null
     },
     {
       "id": 5503,
       "file": "C:\\Temp\\test_download\\active_download_5503",
-      "url": "TokenAuthDownload://mytestserver.mydomain.example.com/sampleurl/sample.html",
+      "url": "AuthDownloadPlugin://mytestserver.mydomain.example.com/sampleurl/sample.html",
       "sha1": "",
       "size": null
     },
     {
       "id": 5504,
       "file": "C:\\Temp\\test_download\\active_download_5504",
-      "url": "TokenAuthDownload://www.google.com/index.html",
+      "url": "AuthDownloadPlugin://www.google.com/index.html",
       "sha1": "",
       "size": null
     }

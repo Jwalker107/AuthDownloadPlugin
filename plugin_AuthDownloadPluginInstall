@@ -1,0 +1,5 @@
+{
+   "message" : "add",
+   "protocol" : "AuthDownloadPlugin",
+   "location" : "C:\\Program Files (x86)\\BigFix Enterprise\\BES Server\\DownloadPlugins\\AuthDownloadPlugin\\AuthDownloadPlugin.exe"
+}
