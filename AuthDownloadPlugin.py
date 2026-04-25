@@ -328,6 +328,7 @@ def download_file_stream(
             raise ValueError(
                 f"Download connection failed for {url} with HTTP {response.status_code}"
             )
+        logging.info(f"Download connection established for {url} with HTTP {response.status_code}, size {response.headers.get('Content-Length', 'unknown')} bytes, starting download...")
         response.raise_for_status()
         with open(output_file_path, "wb") as f:
             chunk_number = 0
@@ -350,9 +351,7 @@ def replace_url(url:str, plugin_system_name:str) -> str:
 def process_download(download_request:dict, plugin_system_name:str, session:requests.Session, timeout_seconds:float, request_headers:dict | None = None) -> dict:
     """Process a single download request and return a dictionary describing success/failure status"""
     result = {}
-    logging.info(f"Processing download id {download_request['id']}")
     url = replace_url(download_request.get("url"), plugin_system_name)
-    logging.info(f"Download URL: {url}")
     logging.info(f"Output file: {download_request.get('file')}")
     # download_file_stream will raise an exception on HTTP errors in addition to connection errors
     # so any response other than 'ok' will be caught by this exception handler
@@ -365,11 +364,12 @@ def process_download(download_request:dict, plugin_system_name:str, session:requ
             timeout_seconds=timeout_seconds,
             chunk_size=65536
         )
+        logging.info(f"Download successful for url {url}")
         result["success"] = True
         result["error"] = None
 
     except Exception as e:
-        logging.info(f"Download failed with {str(e)}")
+        logging.info(f"Download failed with {str(e)} for url {url}")
         result["success"] = False
         result["error"] = str(e)
     return result
@@ -400,6 +400,7 @@ def process_download_list(options:dict, config:dict, session:requests.Session, c
             continue
         # report a download error if auth values could not be retrieved for the matched url_config entry
         try:
+            logging.info(f"Processing download id {download['id']} with url {url} using config '{url_config.get('config_name')}'")
             request_headers = get_request_headers(config, url_config)
         except Exception as e:
             download_result={'id': download['id'], 'success': False, 'error': str(e)}
