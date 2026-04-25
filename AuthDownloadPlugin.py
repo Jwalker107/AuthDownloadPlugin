@@ -6,6 +6,7 @@ This sample demonstrates performing downloads using configurable authentication 
 """
 #curl --header "Authorization: token github_pat_XXXXXXX" https://raw.githubusercontent.com/Jwalker107/AuthDownloadPlugin/main/README.md
 #curl -L -H "Accept: application/octet-stream" -H "Authorization: token github_pat_XXX" https://api.github.com/repos/Jwalker107/AuthDownloadPlugin/releases/assets/141569199 -O
+# update to run automated tests on commit
 
 import os
 import sys
