@@ -433,8 +433,6 @@ def main(downloads=None) -> None:
     config=get_config(config_file)
     config_error_message = None
 
-    # it would be *nice* to init logging earlier, but...currently allow the config_file to specify an alternate log file so need to read config first
-    # supply a default of 'scriptPath\\logfile.txt' in case the config file could not be loaded or is missing this entry
     log_file = os.path.join(scriptPath, 'logfile.txt')
     log_level = 20
     if isinstance(config, dict):
@@ -462,7 +460,7 @@ def main(downloads=None) -> None:
     # process command-line arguments to get the --downloads parameter - the path to a json file containing a list of downloads
     args = argparse.Namespace
     if downloads:
-        # allow downloads to be passed in to main()
+        # allow downloads to be passed in to main() for debugging purposes, otherwise read from command-line arguments as normal
         args.downloads=downloads
     else:
         args=get_args()
