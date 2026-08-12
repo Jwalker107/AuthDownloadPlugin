@@ -5,9 +5,9 @@
   "download_timeout_seconds": 60,
   "url_configs": [
     {
-      "config_name": "default",
+      "config_name": "default-match-any-other-url",
       "url_list": [
-        ".*"
+        "https://.*"
       ],
       "Basic-Auth": {
         "username": "MyAccount1",
